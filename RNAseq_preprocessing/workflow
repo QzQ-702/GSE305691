@@ -1,0 +1,255 @@
+Pre-process
+
+1. download files from Globus (Auckland genomics)
+check md5 sum by openssl (module)
+
+module load openssl
+openssl dgst -md5 data/X201SC24072507-Z01-F001.tar
+
+2. extract files from tar file
+
+mkdir -p /path/to/destination
+tar -xvf data/X201SC24072507-Z01-F001.tar -C /path/to/destination/
+
+
+2. script (md5 checksum) in sbatch job
+
+nano script.txt
+
+#!/bin/bash
+
+# Load the openssl module (adjust this line if necessary for your cluster)
+module load openssl
+
+# Output file for storing the MD5 checksums
+output_file="all_md5_checksums.txt"
+
+# Initialize the output file (this will overwrite if it already exists)
+> $output_file
+
+# Find all .fq.gz files in the RawData directory and its subdirectories
+find RawData/ -type f -name "*.fq.gz" | while read -r file; do
+    # Compute the MD5 checksum using openssl
+    md5sum=$(openssl dgst -md5 "$file" | awk '{print $2}')
+    
+    # Append the checksum and filename to the output file
+    echo "$md5sum  $file" >> $output_file
+done
+
+echo "MD5 checksums for all .fq.gz files have been written to $output_file."
+
+3. combine data of two lanes for forward and backward sequences into one file for each sample
+
+#!/bin/bash
+
+# Exised directory to store the combined samples
+combined_dir="combined_data"
+
+# Loop over each sample directory
+for sample_dir in RawData/*; do
+    if [ -d "$sample_dir" ]; then
+        # Extract the sample number (XX)
+        sample_number=$(basename $sample_dir | cut -d'_' -f2)
+
+        # Define the filenames
+        file1="${sample_dir}/AG1353_${sample_number}_DKDL240003654-1A_HH2GCDSXC_L1_1.fq.gz"
+        file2="${sample_dir}/AG1353_${sample_number}_DKDL240003654-1A_HNWGCDSXC_L3_1.fq.gz"
+        combined_file="${combined_dir}/AG1353_${sample_number}_R1.fq.gz"
+
+        # Combine the files
+        if [ -f "$file1" ] && [ -f "$file2" ]; then
+            cat "$file1" "$file2" > "$combined_file"
+            echo "Combined files for sample $sample_number into $combined_file"
+        else
+            echo "Missing files for sample $sample_number, skipping..."
+        fi
+    fi
+done
+
+echo "All samples combined and saved in the $combined_dir directory."
+
+#!/bin/bash
+
+# Exised directory to store the combined samples
+combined_dir="combined_data"
+
+# Loop over each sample directory
+for sample_dir in RawData/*; do
+    if [ -d "$sample_dir" ]; then
+        # Extract the sample number (XX)
+        sample_number=$(basename $sample_dir | cut -d'_' -f2)
+
+        # Define the filenames
+        file1="${sample_dir}/AG1353_${sample_number}_DKDL240003654-1A_HH2GCDSXC_L1_2.fq.gz"
+        file2="${sample_dir}/AG1353_${sample_number}_DKDL240003654-1A_HNWGCDSXC_L3_2.fq.gz"
+        combined_file="${combined_dir}/AG1353_${sample_number}_R2.fq.gz"
+
+        # Combine the files
+        if [ -f "$file1" ] && [ -f "$file2" ]; then
+            cat "$file1" "$file2" > "$combined_file"
+            echo "Combined files for sample $sample_number into $combined_file"
+        else
+            echo "Missing files for sample $sample_number, skipping..."
+        fi
+    fi
+done
+
+echo "All samples combined and saved in the $combined_dir directory."
+
+4. fastQC
+
+#!/bin/bash
+
+# Load the FastQC module (adjust if necessary)
+module load fastqc
+
+# Define the directory where FastQC reports will be saved
+qc_reports_dir="qc_reports"
+
+# Create the directory if it doesn't exist
+mkdir -p $qc_reports_dir
+
+# Run FastQC on all the combined R1 and R2 files
+for fastq_file in combined_data/*.fq.gz; do
+    fastqc -o $qc_reports_dir $fastq_file
+    echo "Ran FastQC on $fastq_file"
+done
+
+echo "All FastQC reports saved in the $qc_reports_dir directory."
+
+
+
+5. trimming
+
+#copy files to server because no trimming tool installed on the cluster 
+cp -r data/AG1353/combined_data /mnt/auto-hcs/cancer-hub/Eccles_lab_group/Students/PhD/2022_Qi/Data/RNAseq/AG1353/
+
+#use fastp to trim
+
+conda env list
+conda activate fastp
+
+#change current working directory
+cd /Volumes/cancer-hub/Eccles_lab_group/Students/PhD/2022_Qi/Data/RNAseq/AG1353/combined_data
+
+for file in *_R1.fq.gz; do
+    sample=$(basename ${file} _R1.fq.gz)
+    fastp -i ${sample}_R1.fq.gz -I ${sample}_R2.fq.gz -o trimmed_${sample}_R1.fq.gz -O trimmed_${sample}_R2.fq.gz -h ${sample}_fastp_report.html -j ${sample}_fastp_report.json
+done
+
+6. fastQC
+
+#!/bin/bash
+
+# Load the FastQC module (adjust if necessary)
+module load fastqc
+
+# Define the directory where FastQC reports will be saved
+qc_reports_dir="qc_reports"
+
+# Run FastQC on all the combined R1 and R2 files
+for fastq_file in trimmed_data/*.fq.gz; do
+    fastqc -o $qc_reports_dir $fastq_file
+    echo "Ran FastQC on $fastq_file"
+done
+
+echo "All FastQC reports saved in the $qc_reports_dir directory."
+
+7. Mapping HiSAT2
+
+https://www.science.org/doi/10.1126/science.abj6987
+https://github.com/marbl/CHM13
+
+Genome index generation
+
+[zheqi828@aoraki-login index]$ cat hisat2_index_script.txt
+#!/bin/bash
+#SBATCH --job-name=hisat2_index
+#SBATCH --mem=128G
+#SBATCH --cpus-per-task=16
+
+module purge
+module list
+module load hisat2
+
+hisat2-build chm13v2.0.fa chm13v2.0_index
+
+module purge
+module list
+
+———————
+
+#!/bin/bash
+
+#SBATCH --job-name=align_hisat2_bam
+
+module load hisat2 samtools
+
+# Directories
+input_dir=data/AG1353/trimmed_data/
+idx=data/AG1353/hisat2_index/chm13v2.0/chm13v2.0_index
+sam_dir=data/AG1353/sam_files/
+bam_dir=data/AG1353/bam_files/
+sorted_bam_dir=data/AG1353/sorted_bam_files/
+
+# Create directories if they don't exist
+mkdir -p $sam_dir $bam_dir $sorted_bam_dir
+
+echo “Start alignment.”
+
+# Loop through all *_R1.fq.gz files
+for fq1 in ${input_dir}*1.fq.gz; do
+    # Derive the base name
+    base_name=$(basename $fq1 _R1.fq.gz)
+    fq2=${input_dir}${base_name}_R2.fq.gz
+    sam_file=${sam_dir}${base_name}.sam
+    bam_file=${bam_dir}${base_name}.bam
+    sorted_bam_file=${sorted_bam_dir}${base_name}_sorted.bam
+    
+    # HISAT2 alignment
+    hisat2 -x $idx -p 8 -1 $fq1 -2 $fq2 -S $sam_file
+
+    # Convert SAM to BAM
+    samtools view -bS -@ 8 $sam_file > $bam_file
+    
+    # Sort BAM file
+    samtools sort -@ 8 -o $sorted_bam_file $bam_file
+done
+
+echo "Processing completed."
+
+
+8. FeatureCounts
+
+
+#!/bin/bash
+
+#SBATCH --job-name=AG1259-AG1353_chm13_fc # Job name
+#SBATCH --cpus-per-task=8 # Number of CPU cores per task
+#SBATCH --mem=16G # Total memory per node (e.g., 64GB)
+
+# Script to convert BAM files to gene counts using featureCounts from the Subread package
+
+# Load any necessary modules or set up your environment
+module load Subread # Load the subread module if it's available
+module list
+
+# Set variables
+BAM_DIR=data/AG1259-AG1353_hisat2_data/sorted_bam_files/  # Directory containing BAM files
+GTF_FILE=data/GCF_CHM13V2/GCF_009914755.1_T2T-CHM13v2.0_genomic.gtf  # Path to your GTF annotation file
+OUTPUT_DIR=data/AG1259-AG1353_hisat2_data/AG1259-AG1353_chm13_counts  # Directory to save output count files
+THREADS=8  # Number of threads to use
+
+# Create output directory if it doesn't exist
+mkdir -p $OUTPUT_DIR
+
+# Run featureCounts for all BAM files in the directory
+featureCounts -T $THREADS \
+              -a $GTF_FILE \
+              -o $OUTPUT_DIR/counts.txt \
+              -g gene_id \
+              -p \
+              -t exon \
+              -s 2 \
+              $BAM_DIR/*.bam
+echo "Counting completed. Results saved to $OUTPUT_DIR/counts.txt"
