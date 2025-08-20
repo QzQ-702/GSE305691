@@ -1,0 +1,130 @@
+---
+title: "venn"
+output: html_document
+date: "2025-05-07"
+---
+
+# 1. data setup
+
+## 1.1 load packages
+```{r setup, include=FALSE}
+library(dplyr)
+library(UpSetR)
+library(gplots)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(ggplot2)
+library(VennDiagram)
+
+```
+## load files
+
+```{r}
+combined_up <- read.csv("data_output/combined_ADPKD_up.csv", row.names = 1)
+combined_down <- read.csv("data_output/combined_ADPKD_down.csv", row.names = 1)
+
+up_both_siPAX_12 <- read.csv("processed_data/up_both_siPAX_12.csv", row.names = 1)
+down_both_siPAX_12 <- read.csv("processed_data/down_both_siPAX_12.csv", row.names = 1)
+
+```
+
+
+
+```{r}
+# Extract vectors of unique genes
+genes_GSE7869_down <- unique(combined_down$Gene.symbol[combined_down$group == "GSE7869"])
+genes_snRNA_down   <- unique(combined_down$Gene.symbol[combined_down$group == "snRNA"])
+
+genes_GSE7869_up <- unique(combined_up$Gene.symbol[combined_up$group == "GSE7869"])
+genes_snRNA_up   <- unique(combined_up$Gene.symbol[combined_up$group == "snRNA"])
+```
+
+
+```{r}
+library(VennDiagram)
+library(grid)
+
+# --- Downregulated genes Venn ---
+venn_down <- venn.diagram(
+  x = list(
+    GSE7869_down = genes_GSE7869_down,
+    snRNA_down = genes_snRNA_down,
+    all_PAX_treatments_up = up_both_siPAX_12$gene
+  ),
+  filename = NULL,
+  main = "Overlap with downregulated genes in ADPKD",
+  main.cex = 3,
+  cex = 1.5,
+  cat.cex = 1.5,
+  fill = c("#1f78b4", "#e31a1c", "#fdbf6f"),
+  alpha = 0.5,
+  cat.pos = c(-40, 40, -180),
+  cat.dist = 0.1
+)
+
+# --- Upregulated genes Venn ---
+venn_up <- venn.diagram(
+  x = list(
+    GSE7869_up = genes_GSE7869_up,
+    snRNA_up = genes_snRNA_up,
+    all_PAX_treatments_down = down_both_siPAX_12$gene
+  ),
+  filename = NULL,
+  main = "Overlap with upregulated genes in ADPKD",
+  main.cex = 3,
+  cex = 2,
+  cat.cex = 2,
+  fill = c("#a6cee3", "#fca5a5", "#fff7ae"),
+  alpha = 0.5,
+  cat.pos = c(-40, 40, -180),
+  cat.dist = 0.07
+)
+
+# Draw them
+grid.newpage(); grid.draw(venn_down)
+grid.newpage(); grid.draw(venn_up)
+
+```
+
+```{r}
+library(VennDiagram)
+library(grid)
+
+# --- Downregulated genes Venn ---
+venn_down <- venn.diagram(
+  x = list(
+    GSE7869_down = genes_GSE7869_down,
+    snRNA_down = genes_snRNA_down,
+    all_PAX_treatments_up = up_both_siPAX_12$gene
+  ),
+  filename = NULL,
+  cex = 1.5,
+  cat.cex = 1.5,
+  fill = c("#1f78b4", "#e31a1c", "#fdbf6f"),
+  alpha = 0.5,
+  cat.pos = c(-20, 20, -180),
+  cat.dist = 0.07
+)
+
+# --- Upregulated genes Venn ---
+venn_up <- venn.diagram(
+  x = list(
+    GSE7869_up = genes_GSE7869_up,
+    snRNA_up = genes_snRNA_up,
+    all_PAX_treatments_down = down_both_siPAX_12$gene
+  ),
+  filename = NULL,
+  cex = 1.5,
+  cat.cex = 1.5,
+  fill = c("#a6cee3", "#fca5a5", "#fff7ae"),
+  alpha = 0.5,
+  cat.pos = c(-20, 20, -180),
+  cat.dist = 0.07
+)
+
+# Draw them
+grid.newpage(); grid.draw(venn_down)
+grid.newpage(); grid.draw(venn_up)
+
+```

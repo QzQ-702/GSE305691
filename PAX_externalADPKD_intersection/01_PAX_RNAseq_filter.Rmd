@@ -1,0 +1,85 @@
+---
+title: "PAX_RNAseq_filter"
+output: html_document
+date: "2025-04-13"
+---
+
+
+# 1. Data setup
+## load package
+```{r, include=FALSE}
+## load packages
+library("dplyr")
+library("tidyverse")
+library("ggplot2")
+library("pheatmap")
+library("limma")
+library("VennDiagram")
+```
+
+## laod files
+```{r}
+siPAX2 <- read.csv("data/wt9-7_siPAX2_regulation_corrected.csv", row.names = 1)
+siPAX8 <- read.csv("data/wt9-7_siPAX8_regulation_corrected.csv", row.names = 1)
+siPAX <- read.csv("data/wt9-7_siPAX_regulation_corrected.csv", row.names = 1)
+siPAX12 <- read.csv("data/wt9-12_siPAX8_regulation_corrected.csv", row.names = 1)
+```
+
+## split up and down dfs
+
+### siPAX2
+```{r}
+up_siPAX2 <- siPAX2 %>% filter(Regulation == "Up")
+down_siPAX2 <- siPAX2 %>% filter(Regulation == "Down")
+```
+
+### siPAX8
+```{r}
+up_siPAX8 <- siPAX8 %>% filter(Regulation == "Up")
+down_siPAX8 <- siPAX8 %>% filter(Regulation == "Down")
+```
+
+#### WT9-12
+
+```{r}
+siPAX12 <- read.csv("data/wt9-12_siPAX8_regulation_corrected.csv", row.names = 1)
+```
+
+#### siPAX8
+```{r}
+up_siPAX8_12 <- siPAX12 %>% filter(Regulation == "Up")
+down_siPAX8_12 <- siPAX12 %>% filter(Regulation == "Down")
+```
+
+### siPAX
+```{r}
+up_siPAX <- siPAX %>% filter(Regulation == "Up")
+down_siPAX <- siPAX %>% filter(Regulation == "Down")
+```
+
+## filter both regulated (consitantly up or down in all groups)
+### siPAX (WT9-7)
+```{r}
+up_both_siPAX <- up_siPAX %>% 
+  filter(gene %in% up_siPAX2$gene) %>%
+  filter(gene %in% up_siPAX8$gene)
+down_both_siPAX <- down_siPAX %>% 
+  filter(gene %in% down_siPAX2$gene) %>%
+  filter(gene %in% down_siPAX8$gene)
+```
+
+### siPAX (WT9-12)
+```{r}
+up_both_siPAX_12 <- up_both_siPAX %>% 
+  filter(gene %in% up_siPAX8_12$gene)
+down_both_siPAX_12 <- down_both_siPAX %>% 
+  filter(gene %in% down_siPAX8_12$gene)
+```
+
+
+## save filtered DEG dfs
+```{r}
+write.csv(up_both_siPAX_12, "processed_data/up_both_siPAX_12.csv")
+write.csv(down_both_siPAX_12, "processed_data/down_both_siPAX_12.csv")
+```
+

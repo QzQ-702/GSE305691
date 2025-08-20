@@ -1,0 +1,131 @@
+---
+title: "snRNAseq_sig_gene_filter"
+output: html_document
+date: "2025-04-14"
+---
+
+## 1.1 load packages
+```{r setup, include=FALSE}
+library(dplyr)
+library(UpSetR)
+library(gplots)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(ggplot2)
+library(VennDiagram)
+library(grid)
+
+```
+
+# load snRNA data
+```{r}
+snRNA_PT1 <- read.csv("data/snRNA_PT1.csv")
+snRNA_PT2 <- read.csv("data/snRNA_PT2.csv")
+snRNA_CNT_PC <- read.csv("data/snRNA_CNT_PC.csv")
+```
+
+## filter sig DEGs by grouping up or down
+```{r}
+snRNA_PT1_up <- snRNA_PT1 %>% filter(avg_log2FC > 0) %>% filter(p_val_adj < 0.05)
+snRNA_PT2_up <- snRNA_PT2 %>% filter(avg_log2FC > 0) %>% filter(p_val_adj < 0.05)
+snRNA_CNT_PC_up <- snRNA_CNT_PC %>% filter(avg_log2FC > 0) %>% filter(p_val_adj < 0.05)
+
+snRNA_PT1_down <- snRNA_PT1 %>% filter(avg_log2FC < 0) %>% filter(p_val_adj < 0.05)
+snRNA_PT2_down <- snRNA_PT2 %>% filter(avg_log2FC < 0) %>% filter(p_val_adj < 0.05)
+snRNA_CNT_PC_down <- snRNA_CNT_PC %>% filter(avg_log2FC < 0) %>% filter(p_val_adj < 0.05)
+```
+
+## Combine all upregulated gene lists
+```{r}
+# Add a column to identify the source dataset
+snRNA_PT1_up <- snRNA_PT1_up %>% mutate(source = "PT1")
+snRNA_PT2_up <- snRNA_PT2_up %>% mutate(source = "PT2")
+snRNA_CNT_PC_up <- snRNA_CNT_PC_up %>% mutate(source = "CNT_PC")
+
+snRNA_PT1_down <- snRNA_PT1_down %>% mutate(source = "PT1")
+snRNA_PT2_down <- snRNA_PT2_down %>% mutate(source = "PT2")
+snRNA_CNT_PC_down <- snRNA_CNT_PC_down %>% mutate(source = "CNT_PC")
+
+# Combine them into one dataframe
+all_up_genes <- bind_rows(snRNA_PT1_up, snRNA_PT2_up, snRNA_CNT_PC_up)
+
+all_down_genes <- bind_rows(snRNA_PT1_down, snRNA_PT2_down, snRNA_CNT_PC_down)
+```
+
+### save sig DEGs in snRNAseq
+```{r}
+write.csv(snRNA_PT1_up, "processed_data/snRNA_PT1_up.csv", row.names = FALSE)
+write.csv(snRNA_PT2_up, "processed_data/snRNA_PT2_up.csv", row.names = FALSE)
+write.csv(snRNA_CNT_PC_up, "processed_data/snRNA_PT2_up.csv", row.names = FALSE)
+
+write.csv(snRNA_PT1_down, "processed_data/snRNA_PT1_down.csv", row.names = FALSE)
+write.csv(snRNA_PT2_down, "processed_data/snRNA_PT2_down.csv", row.names = FALSE)
+write.csv(snRNA_CNT_PC_down, "processed_data/snRNA_PT2_down.csv", row.names = FALSE)
+```
+
+```{r}
+write.csv(all_up_genes, "processed_data/all_up_genes.csv", row.names = FALSE)
+write.csv(all_down_genes, "processed_data/all_down_genes.csv", row.names = FALSE)
+```
+
+## venn plot for checking overlapping genes
+
+### extract gene list as vectors
+```{r}
+vec_snRNA_PT1_up <- snRNA_PT1_up %>% pull(X)
+vec_snRNA_PT2_up <- snRNA_PT2_up %>% pull(X)
+vec_snRNA_CNT_PC_up <- snRNA_CNT_PC_up %>% pull(X)
+
+vec_snRNA_PT1_down <- snRNA_PT1_down %>% pull(X)
+vec_snRNA_PT2_down <- snRNA_PT2_down %>% pull(X)
+vec_snRNA_CNT_PC_down <- snRNA_CNT_PC_down %>% pull(X)
+
+vec_all_up_genes <- all_up_genes %>% pull(X)
+vec_all_down_genes <- all_down_genes %>% pull(X)
+```
+
+## Venn Diagram for checking any overlapping genes between up and down snRNAseq_sig_UP
+```{r}
+## Create a list of "Up" regulated genes
+snRNA_up_list <- list(PT1 = vec_snRNA_PT1_up, PT2 = vec_snRNA_PT2_up, CNT_PC = vec_snRNA_CNT_PC_up)
+# Plot Venn diagram
+venn.plot <- venn.diagram(
+  x = snRNA_up_list,
+  category.names = c("PT1", "PT2", "CNT_PC"),
+  filename = NULL,  # So it displays in R, not saved to a file
+  output = TRUE
+)
+# Display the plot
+grid.draw(venn.plot)
+```
+
+
+## Venn Diagram for checking any overlapping genes between up and down
+```{r}
+## Create a list of "Up" regulated genes
+snRNA_down_list <- list(PT1 = vec_snRNA_PT1_down, PT2 = vec_snRNA_PT2_down, CNT_PC = vec_snRNA_CNT_PC_down)
+# Plot Venn diagram
+venn.plot <- venn.diagram(
+  x = snRNA_down_list,
+  category.names = c("PT1", "PT2", "CNT_PC"),
+  filename = NULL,  # So it displays in R, not saved to a file
+  output = TRUE
+)
+# Display the plot
+grid.draw(venn.plot)
+```
+
+```{r}
+## Create a list of "Up" regulated genes
+snRNA_all_list <- list(Up = vec_all_up_genes, Down = vec_all_down_genes)
+# Plot Venn diagram
+venn.plot <- venn.diagram(
+  x = snRNA_all_list,
+  category.names = c("Up", "Down"),
+  filename = NULL,  # So it displays in R, not saved to a file
+  output = TRUE
+)
+# Display the plot
+grid.draw(venn.plot)
+```

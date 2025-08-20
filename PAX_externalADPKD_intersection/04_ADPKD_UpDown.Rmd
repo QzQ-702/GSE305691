@@ -1,0 +1,96 @@
+---
+title: "ADPKD_UpDown"
+output: html_document
+date: "2025-04-16"
+---
+1 set up
+
+
+## 1.1 load packages
+```{r setup, include=FALSE}
+library(dplyr)
+library(UpSetR)
+library(gplots)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(ggplot2)
+
+```
+
+## load GSE7869 data
+```{r}
+
+GSE7869_sig_up_filtered <- read.csv("processed_data/GSE7869_sig_up_filtered.csv", row.names = 1)
+GSE7869_sig_down_filtered <- read.csv("processed_data/GSE7869_sig_down_filtered.csv", row.names = 1)
+
+GSE7869_sig_up_filtered <- GSE7869_sig_up_filtered %>% mutate(source = "GSE7869")
+GSE7869_sig_down_filtered <- GSE7869_sig_down_filtered %>% mutate(source = "GSE7869")
+```
+
+## load snRNA data
+```{r}
+snRNA_PT1_up <- read.csv("processed_data/snRNA_PT1_up.csv", row.names = 1)
+snRNA_PT2_up <- read.csv("processed_data/snRNA_PT2_up.csv", row.names = 1)
+snRNA_CNT_PC_up <- read.csv("processed_data/snRNA_PT2_up.csv", row.names = 1)
+
+snRNA_PT1_down <- read.csv("processed_data/snRNA_PT1_down.csv", row.names = 1)
+snRNA_PT2_down <- read.csv("processed_data/snRNA_PT2_down.csv", row.names = 1)
+snRNA_CNT_PC_down <- read.csv("processed_data/snRNA_PT2_down.csv", row.names = 1)
+```
+
+```{r}
+all_up_genes <- read.csv("processed_data/all_up_genes.csv")
+all_down_genes <- read.csv("processed_data/all_down_genes.csv")
+```
+
+
+```{r}
+all_up_genes <- all_up_genes %>% rename(
+    Gene.symbol = X,
+    logFC = avg_log2FC,
+    adj.P.Val = p_val_adj
+  )
+
+
+```
+
+```{r}
+all_down_genes <- all_down_genes %>% rename(
+    Gene.symbol = X,
+    logFC = avg_log2FC,
+    adj.P.Val = p_val_adj
+  )
+```
+
+```{r}
+combined_up <- bind_rows(
+  GSE7869_sig_up_filtered %>% select(Gene.symbol, logFC, adj.P.Val, source),
+  all_up_genes %>% select(Gene.symbol, logFC, adj.P.Val, source)
+)
+
+combined_down <- bind_rows(
+  GSE7869_sig_down_filtered %>% select(Gene.symbol, logFC, adj.P.Val, source),
+  all_down_genes %>% select(Gene.symbol, logFC, adj.P.Val, source)
+)
+
+```
+
+```{r}
+# For combined_up
+combined_up <- combined_up %>%
+  mutate(group = ifelse(source == "GSE7869", "GSE7869", "snRNA"))
+
+# For combined_down
+combined_down <- combined_down %>%
+  mutate(group = ifelse(source == "GSE7869", "GSE7869", "snRNA"))
+
+```
+
+
+```{r}
+write.csv(combined_up, "data_output/combined_ADPKD_up.csv")
+write.csv(combined_down, "data_output/combined_ADPKD_down.csv")
+```
+
+

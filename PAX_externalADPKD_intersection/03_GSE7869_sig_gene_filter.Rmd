@@ -1,0 +1,157 @@
+---
+title: "GSE7869_sig_gene_filter"
+output: html_document
+date: "2025-04-14"
+---
+
+# 1. data setup
+## 1.1 load packages
+```{r setup, include=FALSE}
+library(dplyr)
+library(UpSetR)
+library(gplots)
+library(AnnotationDbi)
+library(org.Hs.eg.db)
+library(clusterProfiler)
+library(ggplot2)
+library(VennDiagram)
+
+```
+
+## 1.2 laod GSE7869 results (human ADPKD cysts vs minimality cystic tissue)
+```{r}
+GSE7869_up <- read.csv("data/GSE7869_sig_up_DEGs_results.csv", row.names = 1)
+GSE7869_down <- read.csv("data/GSE7869_sig_down_DEGs_results.csv", row.names = 1)
+```
+the DEGs results used padj<0.05 and Gene.symbol contains blank value and multiple gene symbols.
+
+
+## filter out rows with no gene symbol or multiple gene symbols
+```{r}
+up_GSE7869 <- GSE7869_up %>%
+  filter(Gene.symbol != "") %>%
+  filter(!grepl("///", Gene.symbol))
+
+down_GSE7869 <- GSE7869_down %>%
+  filter(Gene.symbol != "") %>%
+  filter(!grepl("///", Gene.symbol))
+```
+
+### extract gene list as vectors
+```{r}
+vec_up_GSE7869 <- up_GSE7869 %>% pull(Gene.symbol)
+vec_down_GSE7869 <- down_GSE7869 %>% pull(Gene.symbol)
+```
+
+## Venn Diagram for checking any overlapping genes between up and down
+```{r}
+## Create a list of "Up" regulated genes
+GSE7869_gene_list <- list(Up = vec_up_GSE7869, Down = vec_down_GSE7869)
+# Plot Venn diagram
+venn.plot <- venn.diagram(
+  x = GSE7869_gene_list,
+  category.names = c("Up1", "Down2"),
+  filename = NULL,  # So it displays in R, not saved to a file
+  output = TRUE
+)
+# Display the plot
+grid.draw(venn.plot)
+```
+
+### remove cross genes (appear in both up and down)
+```{r}
+up_GSE7869_filt <- up_GSE7869 %>% filter(!Gene.symbol %in% vec_down_GSE7869)
+down_GSE7869_filt <- down_GSE7869 %>% filter(!Gene.symbol %in% vec_up_GSE7869)
+```
+
+### extract gene list as vectors
+```{r}
+vec_up_GSE7869_filt <- up_GSE7869_filt %>% pull(Gene.symbol)
+vec_down_GSE7869_filt <- down_GSE7869_filt %>% pull(Gene.symbol)
+```
+
+## Venn Diagram for checking any overlapping genes between up and down
+```{r}
+## Create a list of "Up" regulated genes
+GSE7869_filt_genes_list <- list(Up = vec_up_GSE7869_filt, Down = vec_down_GSE7869_filt)
+# Plot Venn diagram
+venn.plot <- venn.diagram(
+  x = GSE7869_filt_genes_list,
+  category.names = c("Up2", "Down2"),
+  filename = NULL,  # So it displays in R, not saved to a file
+  output = TRUE
+)
+# Display the plot
+grid.draw(venn.plot)
+```
+
+### remove duplicates and keep the one with the highest padj
+```{r}
+up_GSE7869_filtered <- up_GSE7869_filt %>%
+  group_by(Gene.symbol) %>%
+  slice_min(order_by = adj.P.Val, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+down_GSE7869_filtered <- down_GSE7869_filt %>%
+  group_by(Gene.symbol) %>%
+  slice_min(order_by = adj.P.Val, n = 1, with_ties = FALSE) %>%
+  ungroup()
+
+```
+
+### save DEGs
+```{r}
+write.csv(up_GSE7869_filtered, "data_output/up_GSE7869_unique_filtered.csv")
+write.csv(down_GSE7869_filtered, "data_output/down_GSE7869_unique_filtered.csv")
+```
+
+### keep dulplicates for checking
+```{r}
+# Rows with duplicated Gene.symbol
+dpl_up_GSE7869 <- up_GSE7869 %>%
+  filter(duplicated(Gene.symbol) | duplicated(Gene.symbol, fromLast = TRUE))
+
+# Rows with duplicated Gene.symbol
+dpl_down_GSE7869 <- down_GSE7869 %>%
+  filter(duplicated(Gene.symbol) | duplicated(Gene.symbol, fromLast = TRUE))
+```
+
+### save duplicates
+```{r}
+write.csv(dpl_up_GSE7869, "data_output/dpl_up_GSE7869.csv")
+write.csv(dpl_down_GSE7869, "data_output/dpl_down_GSE7869.csv")
+```
+
+### venn plot to visualise
+### extract gene list as vectors
+```{r}
+vec_up_GSE7869_filtered <- up_GSE7869_filtered %>% pull(Gene.symbol)
+vec_down_GSE7869_filtered <- down_GSE7869_filtered %>% pull(Gene.symbol)
+```
+
+```{r}
+## Create a list of "Up" regulated genes
+GSE7869_filtered_genes_list <- list(Up = vec_up_GSE7869_filtered, Down = vec_down_GSE7869_filtered)
+# Plot Venn diagram
+venn.plot <- venn.diagram(
+  x = GSE7869_filtered_genes_list,
+  category.names = c("Up3", "Down3"),
+  filename = NULL,  # So it displays in R, not saved to a file
+  output = TRUE
+)
+# Display the plot
+grid.draw(venn.plot)
+```
+
+## significant DEGs with p.adj <0.05 (already done before this R by using GO online)
+```{r}
+GSE7869_sig_up_filtered <- up_GSE7869_filtered %>% filter(adj.P.Val < 0.05)
+GSE7869_sig_down_filtered <- down_GSE7869_filtered %>% filter(adj.P.Val < 0.05)
+
+```
+
+```{r}
+write.csv(GSE7869_sig_up_filtered, "processed_data/GSE7869_sig_up_filtered.csv")
+write.csv(GSE7869_sig_down_filtered, "processed_data/GSE7869_sig_down_filtered.csv")
+```
+
